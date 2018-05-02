@@ -348,6 +348,41 @@ class CSRGraph {
     }
 #endif
   }
+
+  void buildPushSegmentedGraphs(std::string label, int numSegments, bool numa_aware=false, std::string path="") {
+    auto graphSegments = new GraphSegments<DestID_,NodeID_>(numSegments, numa_aware);
+    label_to_segment[label] = graphSegments;
+
+    int segmentRange = (num_nodes() + numSegments - 1) / numSegments;
+    //Go through the original graph and count the number of target vertices and edges for each segment
+
+    for (auto s : vertices()){
+      for (auto d : out_neigh(s)){
+	int segment_id;
+	if (std::is_same<DestID_, NodeWeight<>>::value)
+	  segment_id = static_cast<NodeWeight<>>(d).v/segmentRange;
+	else
+	  segment_id = d/segmentRange;
+	graphSegments->getSegmentedGraph(segment_id)->countEdge(s);
+      }
+    }
+
+    //Allocate each segment
+    graphSegments->allocate();
+
+    //Add the edges for each segment
+    for (auto s : vertices()){
+      for (auto d : out_neigh(s)){
+	int segment_id;
+	if (std::is_same<DestID_, NodeWeight<>>::value)
+	  segment_id = static_cast<NodeWeight<>>(d).v/segmentRange;
+	else
+	  segment_id = d/segmentRange;
+	graphSegments->getSegmentedGraph(segment_id)->addEdge(s, d);
+      }
+    }
+  }
+
  
   //useful for deduplication
   int* flags_;
